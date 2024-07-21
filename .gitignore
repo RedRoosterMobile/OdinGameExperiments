@@ -1,4 +1,4 @@
 # ignore files without file extenstion
-*.*
-!*.*/
-!*.*
+game
+gorillas
+odin
