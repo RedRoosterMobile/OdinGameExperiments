@@ -1,92 +1,232 @@
 package game
 
 import rl "vendor:raylib"
+import "core:mem"
+import "core:fmt"
+import "core:encoding/json"
+import "core:os"
+
+Animation_Name :: enum {
+    Idle,
+    Run,
+}
+
+Animation :: struct {
+    texture: rl.Texture2D,
+    num_frames: int,
+    frame_timer: f32,
+    current_frame: int,
+    frame_length: f32,
+    name: Animation_Name,
+}
+
+update_animation :: proc(a: ^Animation) {
+    a.frame_timer += rl.GetFrameTime()
+
+    if a.frame_timer > a.frame_length {
+        a.current_frame += 1
+        a.frame_timer = 0
+
+        if a.current_frame == a.num_frames {
+            a.current_frame = 0
+        }
+    }
+}
+
+draw_animation :: proc(a: Animation, pos: rl.Vector2, flip: bool) {
+    width := f32(a.texture.width)
+    height := f32(a.texture.height)
+
+    source := rl.Rectangle {
+        x = f32(a.current_frame) * width / f32(a.num_frames),
+        y = 0,
+        width = width / f32(a.num_frames),
+        height = height,
+    }
+
+    if flip {
+        source.width = -source.width
+    }
+
+    dest := rl.Rectangle {
+        x = pos.x,
+        y = pos.y,
+        width = width / f32(a.num_frames),
+        height = height,
+    }
+
+    rl.DrawTexturePro(a.texture, source, dest, {dest.width/2, dest.height}, 0, rl.WHITE)
+}
+
+PixelWindowHeight :: 180
+
+Level :: struct {
+    platforms: [dynamic]rl.Vector2,
+}
+
+platform_collider :: proc(pos: rl.Vector2) -> rl.Rectangle {
+    return {
+        pos.x, pos.y,
+        96, 16,
+    }
+}
 
 main :: proc() {
-	rl.InitWindow(1280, 720, "Cat Jump")
-	player_pos := rl.Vector2{640, 320}
-	player_vel: rl.Vector2
-	player_grounded: bool
-	player_flip: bool
-	player_run_texture := rl.LoadTexture("cat_run.png")
-	player_run_num_frames := 4
-	player_run_frame_timer: f32
-	player_run_current_frame: int
-	player_run_frame_length := f32(0.1)
+    track: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&track, context.allocator)
+    context.allocator = mem.tracking_allocator(&track)
 
-	for !rl.WindowShouldClose() {
-		rl.BeginDrawing()
-		rl.ClearBackground({110, 184, 168, 255})
+    defer {
+        for _, entry in track.allocation_map {
+            fmt.eprintf("%v leaked %v bytes\n", entry.location, entry.size)
+        }
+        for entry in track.bad_free_array {
+            fmt.eprintf("%v bad free\n", entry.location)
+        }
+        mem.tracking_allocator_destroy(&track)
+    }
 
-		if rl.IsKeyDown(.LEFT) {
-			player_vel.x = -400
-			player_flip = true
-		} else if rl.IsKeyDown(.RIGHT) {
-			player_vel.x = 400
-			player_flip = false
-		} else {
-			player_vel.x = 0
-		}
+    rl.InitWindow(1920, 1080, "My First Game")
+    rl.SetWindowPosition(200, 200)
+    rl.SetWindowState({.WINDOW_RESIZABLE})
+    rl.SetTargetFPS(500)
+    player_pos: rl.Vector2
+    player_vel: rl.Vector2
+    player_grounded: bool
+    player_flip: bool
 
-		player_vel.y += 2000 * rl.GetFrameTime()
+    player_run := Animation {
+        texture = rl.LoadTexture("cat_run.png"),
+        num_frames = 4,
+        frame_length = 0.1,
+        name = .Run,
+    }
 
-		if player_grounded && rl.IsKeyPressed(.SPACE) {
-			player_vel.y = -600
-			player_grounded = false
-		}
+    player_idle := Animation {
+        texture = rl.LoadTexture("cat_idle.png"),
+        num_frames = 2,
+        frame_length = 0.5,
+        name = .Idle,
+    }
 
-		player_pos += player_vel * rl.GetFrameTime()
+    current_anim := player_idle
 
-		if player_pos.y > f32(rl.GetScreenHeight()) - 64 {
-			player_pos.y = f32(rl.GetScreenHeight()) - 64
-			player_grounded = true
-		}
+    level: Level
 
-		player_run_width := f32(player_run_texture.width)
-		player_run_height := f32(player_run_texture.height)
+    if level_data, ok := os.read_entire_file("level.json", context.temp_allocator); ok {
+        if json.unmarshal(level_data, &level) != nil {
+            append(&level.platforms, rl.Vector2 { -20, 20 })
+        }
+    } else {
+        append(&level.platforms, rl.Vector2 { -20, 20 })
+    }
 
-		player_run_frame_timer += rl.GetFrameTime()
+    platform_texture := rl.LoadTexture("platform.png")
+    editing := false
 
-		if player_run_frame_timer > player_run_frame_length {
-			player_run_current_frame += 1
-			player_run_frame_timer = 0
+    for !rl.WindowShouldClose() {
+        rl.BeginDrawing()
+        rl.ClearBackground({110, 184, 168, 255})
 
-			if player_run_current_frame == player_run_num_frames {
-				player_run_current_frame = 0
-			}
-		}
+        if rl.IsKeyDown(.LEFT) {
+            player_vel.x = -100
+            player_flip = true
 
-		frame_width := player_run_width / f32(player_run_num_frames)
-		frame_offset := f32(player_run_current_frame) * frame_width
-		if (player_grounded && player_vel.x == 0) {
-			frame_offset = 3 * frame_width
-		} else if (!player_grounded) {
-			frame_offset = 2 * frame_width
-		}
+            if current_anim.name != .Run {
+                current_anim = player_run
+            }
+        } else if rl.IsKeyDown(.RIGHT) {
+            player_vel.x = 100
+            player_flip = false
 
-		draw_player_source := rl.Rectangle {
-			x      = frame_offset,
-			y      = 0,
-			width  = player_run_width / f32(player_run_num_frames),
-			height = player_run_height,
-		}
+            if current_anim.name != .Run {
+                current_anim = player_run
+            }
+        } else {
+            player_vel.x = 0
 
-		// >> from here
-		if player_flip {
-			draw_player_source.width = -draw_player_source.width
-		}
-		// << to here
+            if current_anim.name != .Idle {
+                current_anim = player_idle
+            }
+        }
 
-		draw_player_dest := rl.Rectangle {
-			x      = player_pos.x,
-			y      = player_pos.y,
-			width  = player_run_width * 4 / f32(player_run_num_frames),
-			height = player_run_height * 4,
-		}
+        player_vel.y += 1000 * rl.GetFrameTime()
 
-		rl.DrawTexturePro(player_run_texture, draw_player_source, draw_player_dest, 0, 0, rl.WHITE)
-		rl.EndDrawing()
-	}
+        if player_grounded && rl.IsKeyPressed(.SPACE) {
+            player_vel.y = -300
+        }
 
-	rl.CloseWindow()
+        player_pos += player_vel * rl.GetFrameTime()
+
+        player_feet_collider := rl.Rectangle {
+            player_pos.x - 4,
+            player_pos.y - 4,
+            8,
+            4,
+        }
+
+        player_grounded = false
+
+        for platform in level.platforms {
+            if rl.CheckCollisionRecs(player_feet_collider, platform_collider(platform)) && player_vel.y > 0 {
+                player_vel.y = 0
+                player_pos.y = platform.y
+                player_grounded = true
+            }
+        }
+
+        update_animation(&current_anim)
+
+        screen_height := f32(rl.GetScreenHeight())
+
+        camera := rl.Camera2D {
+            zoom = screen_height/PixelWindowHeight,
+            offset = {f32(rl.GetScreenWidth()/2), screen_height/2},
+            target = player_pos,
+        }
+
+        rl.BeginMode2D(camera)
+        draw_animation(current_anim, player_pos, player_flip)
+        for platform in level.platforms {
+            rl.DrawTextureV(platform_texture, platform, rl.WHITE)
+        }
+        //rl.DrawRectangleRec(player_feet_collider, {0, 255, 0, 100})
+
+        if rl.IsKeyPressed(.F2) {
+            editing = !editing
+        }
+
+        if editing {
+            mp := rl.GetScreenToWorld2D(rl.GetMousePosition(), camera)
+
+            rl.DrawTextureV(platform_texture, mp, rl.WHITE)
+
+            if rl.IsMouseButtonPressed(.LEFT) {
+                append(&level.platforms, mp)
+            }
+
+            if rl.IsMouseButtonPressed(.RIGHT) {
+                for p, idx in level.platforms {
+                    if rl.CheckCollisionPointRec(mp, platform_collider(p)) {
+                        unordered_remove(&level.platforms, idx)
+                        break
+                    }
+                }
+            }
+        }
+
+        rl.EndMode2D()
+        rl.EndDrawing()
+
+        free_all(context.temp_allocator)
+    }
+
+    rl.CloseWindow()
+
+    if level_data, err := json.marshal(level, allocator = context.temp_allocator); err == nil {
+        os.write_entire_file("level.json", level_data)
+    }
+
+    free_all(context.temp_allocator)
+    delete(level.platforms)
 }

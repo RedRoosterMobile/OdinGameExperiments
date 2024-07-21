@@ -4,3 +4,10 @@ https://www.raylib.com/cheatsheet/cheatsheet.html
 
 
 odin run game.odin -file
+
+
+
+
+Mentioned resources:
+- Fix your timestep article: https://gafferongames.com/post/fix_yo...
+- Odin Box2D bindings: https://github.com/cr1sth0fer/odin-box2d and https://gitlab.com/L-4/odin-box2c (I don't know which of these bindings is the best)
