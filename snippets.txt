@@ -1,0 +1,7 @@
+frame_width := player_run_width / f32(player_run_num_frames)
+		frame_offset := f32(player_run_current_frame) * frame_width
+		if (player_grounded && player_vel.x == 0) {
+			frame_offset = 3 * frame_width
+		} else if (!player_grounded) {
+			frame_offset = 2 * frame_width
+		}
