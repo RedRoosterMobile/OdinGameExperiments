@@ -86,7 +86,7 @@ main :: proc() {
         mem.tracking_allocator_destroy(&track)
     }
 
-    rl.InitWindow(1920, 1080, "My First Game")
+    rl.InitWindow(1280, 760, "My First Game")
     rl.SetWindowPosition(200, 200)
     rl.SetWindowState({.WINDOW_RESIZABLE})
     rl.SetTargetFPS(500)
@@ -229,4 +229,5 @@ main :: proc() {
 
     free_all(context.temp_allocator)
     delete(level.platforms)
+
 }

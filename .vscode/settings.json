@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "aabb.h": "c",
+        "box2d.h": "c"
+    }
+}

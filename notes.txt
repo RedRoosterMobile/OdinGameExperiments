@@ -1,6 +1,8 @@
 https://www.youtube.com/watch?v=braSC-5wAwk
 https://www.raylib.com/cheatsheet/cheatsheet.html
 
+physics:
+https://github.com/johnBuffer/VerletSFML
 
 
 odin run game.odin -file

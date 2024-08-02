@@ -10,15 +10,10 @@ import rl "vendor:raylib"
 PixelWindowHeight :: 180
 
 
-platform_collider :: proc(pos: rl.Vector2) -> rl.Rectangle {
-	return {pos.x, pos.y, 96, 16}
-}
-
 main :: proc() {
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
-	
 
 
 	defer {
@@ -30,7 +25,7 @@ main :: proc() {
 		}
 		mem.tracking_allocator_destroy(&track)
 	}
-    
+
 
 	rl.InitWindow(1280, 720, "A shader")
 	rl.SetWindowPosition(200, 200)
@@ -38,31 +33,47 @@ main :: proc() {
 	rl.SetTargetFPS(60)
 
 
-	platform_texture := rl.LoadTexture("platform.png")
-    shader := rl.LoadShader("shaders/shader_earth.vs","shaders/shader_earth.fs")
-
+	platform_texture := rl.LoadTexture("shield.png")
+	shader := rl.LoadShader("shaders/shader_earth.vs", "shaders/shader_earth.fs")
+    secondsLoc := rl.GetShaderLocation(shader, "seconds");
+	seconds := f32(0)
 
 	for !rl.WindowShouldClose() {
+		seconds = rl.GetFrameTime()
+
+        
+		rl.SetShaderValue(shader, secondsLoc, &seconds, rl.ShaderUniformDataType.FLOAT)
 		rl.BeginDrawing()
-		rl.ClearBackground({110, 184, 168, 255})
+		rl.ClearBackground({0, 0, 0, 255})
 
 		screen_height := f32(rl.GetScreenHeight())
 
 		camera := rl.Camera2D {
-			zoom   = screen_height / PixelWindowHeight,
-			offset = {f32(rl.GetScreenWidth() / 2), screen_height / 2},
+			// zoom   = screen_height / PixelWindowHeight,
+			// offset = {f32(rl.GetScreenWidth() / 2), screen_height / 2},
 			// target = player_pos,
 		}
+        rl.DrawTextureV(platform_texture, {0, 0}, rl.WHITE)
+        rl.DrawCircleV({400,400},30,rl.RED)
+// check: https://www.raylib.com/examples.html  texture outline
+        rl.BeginShaderMode(shader)
+		// https://www.raylib.com/examples.html
+		
+		rl.DrawTexture(platform_texture, platform_texture.width, 0, rl.WHITE)
 
+		rl.EndShaderMode()
 		rl.BeginMode2D(camera)
-
+        
+        
+        //rl.DrawTexture(platform_texture, 200, 200, rl.WHITE)
 
 		rl.EndMode2D()
+		
 		rl.EndDrawing()
 
 		free_all(context.temp_allocator)
 	}
-
+	rl.UnloadShader(shader)
 	rl.CloseWindow()
 
 	free_all(context.temp_allocator)
